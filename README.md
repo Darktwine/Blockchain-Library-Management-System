@@ -19,27 +19,34 @@ In a network of nodes, each node can request a book from another node that has i
 
 2) Open up an API client (such as Postman or Insomnia).
 
-3) Register a list of all nodes on each port, using the "new_nodes" POST method.
+3) Register a list of all nodes on each port, using the "new_nodes" POST method
+
     Example: http://localhost:5000/new_nodes
+        
         In JSON format:
+        ```
         {
 	        "nodes": ["127.0.0.1:5000", 
 					  "127.0.0.1:5001",
 				      "127.0.0.1:5002",
 					  "127.0.0.1:5003"]
         }
-
+        ```
     In this demo, we will treat node 1 as port 5000, node 2 as port 5001, node 3 as port 5002, and node 4 as port 5003.
 
 4) Create a new request from node 1 using the "add_request" POST method. This should contain the necessary keys listed in the method. The sender address is node 1 and the receiver is node 2. A success message should return.
+
     Example: http://localhost:5000/add_request
+
         In JSON format:
+        ```
         {
             "sender_address": "127.0.0.1:5000",
             "receiver_address": "127.0.0.1:5001",
             "request_message": "I request book b1 from you."
         }
-
+        ```
+        
 5) Then with the same request information, call the "set_request" POST method.
 
 6) Call "get_request_id" GET method, and copy the randomly generated id.
