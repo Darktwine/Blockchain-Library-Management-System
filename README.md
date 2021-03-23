@@ -26,10 +26,10 @@ In a network of nodes, each node can request a book from another node that has i
     In JSON format:
     
         {
-		"nodes": ["127.0.0.1:5000", 
-			  "127.0.0.1:5001",
-			  "127.0.0.1:5002",
-			  "127.0.0.1:5003"]
+			"nodes": ["127.0.0.1:5000", 
+			  	  "127.0.0.1:5001",
+			  	  "127.0.0.1:5002",
+			  	  "127.0.0.1:5003"]
         }
 	
     In this demo, we will treat node 1 as port 5000, node 2 as port 5001, node 3 as port 5002, and node 4 as port 5003.
