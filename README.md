@@ -43,6 +43,7 @@ In a network of nodes, each node can request a book from another node that has i
         {
             "sender_address": "127.0.0.1:5000",
             "receiver_address": "127.0.0.1:5001",
+	    "book_id": 17,
             "request_message": "I request book b1 from you."
         }
         
@@ -56,3 +57,9 @@ In a network of nodes, each node can request a book from another node that has i
 8) Now switch to node 2. Call the get_request GET method and we should obtain the request message from node 1. However, get_request_id GET method should not work.
 
 9) Switch to node 3, and call the get_request_id GET method. Should return the request id. However, get_request should not work. This is the same for node 4, and all other nodes in the network that were not the receiver address.
+
+10) Since node 2 now has the request, it can use the book id to encrypt the book. Passing in the sender address, receiver address, and book id, call the add_book POST method. This will send the encrypted book to the receiver (node 1 in this case), and the key to decrypt the book to nodes 3 and 4.
+
+11) Switch to node 1 and call get_book GET method. Should recieve a message with the encrypted book. However, should not be able to access the book key.
+
+12) Switch to node 3 and call get_book_key GET method. Should recieve the key to decrypt the book. However, should not be able to access the encrypted book. Same for node 4.
