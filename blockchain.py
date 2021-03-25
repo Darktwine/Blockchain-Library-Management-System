@@ -17,6 +17,7 @@ class Blockchain:
         self.request_id = []
         self.book = []
         self.book_key = []
+        self.is_miner = False
         self.nodes = set()
 
         self.new_block(previous_hash='0')
@@ -43,6 +44,7 @@ class Blockchain:
         self.request_id = []
         self.book = []
         self.book_key = []
+        self.is_miner = False
         self.chain.append(block)
         return block
 
@@ -92,6 +94,15 @@ class Blockchain:
                 counter += 1
         if confirm / counter > 0.5:
             return True
+        return False
+
+    def set_miner(self):
+        self.is_miner = True
+
+    def verify_miner(self):
+        if self.is_miner == True:
+            return True
+        
         return False
 
     def send_request(self, sender_address, receiver_address, book_id, request_message):
@@ -265,6 +276,9 @@ def new_nodes():
 # Generate a request
 @app.route('/add_request', methods=['POST'])
 def add_request():
+    # for the node creating a new request, set their miner status to true
+    blockchain.set_miner()
+
     # convert the POST info into JSON format, and save into requested_info
     request_info = request.get_json()
 
@@ -445,15 +459,19 @@ def validate_book_key():
 # mine the transaction as a block and add it to the blockchain
 @app.route('/mine_transaction', methods=['POST'])
 def mine_transaction():
-    values = request.get_json()
-    required = ['miner_address', 'request_id', 'book_key']
-    if not all(keys in values for keys in required):
-        return 'Missing keys', 400
+    # verify that the miner is the one who originally sent the request
+    can_mine = blockchain.verify_miner()
 
-    blockchain.send_transaction(values['miner_address'], values['request_id'], values['book_key'])
+    if can_mine:
+        values = request.get_json()
+        required = ['miner_address', 'request_id', 'book_key']
+        if not all(keys in values for keys in required):
+            return 'Missing keys', 400
 
-    response = {'message': "Transaction has been mined and added to the blockchain."}
-    return jsonify(response), 200
+        blockchain.send_transaction(values['miner_address'], values['request_id'], values['book_key'])
+
+        response = {'message': "Transaction has been mined and added to the blockchain."}
+        return jsonify(response), 200
 
 # set the transaction for every node in the network
 @app.route('/set_transaction', methods=['POST'])
