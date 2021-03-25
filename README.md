@@ -34,7 +34,7 @@ In a network of nodes, each node can request a book from another node that has i
 	
     In this demo, we will treat node 1 as port 5000, node 2 as port 5001, node 3 as port 5002, and node 4 as port 5003.
 
-4) Create a new request from node 1 using the "add_request" POST method. This should contain the necessary keys listed in the method. The sender address is node 1 and the receiver is node 2. A success message should return.
+4) Create a new request from node 1 using the "add_request" POST method. This should contain the necessary keys listed in the method. The sender address is node 1 and the receiver is node 2. Calling this will send the request to only node 2, and the request id to only nodes 3 and 4. A success message should return.
 
     Example: http://localhost:5000/add_request
 
@@ -47,19 +47,13 @@ In a network of nodes, each node can request a book from another node that has i
             "request_message": "I request book b1 from you."
         }
         
-        
-5) Then with the same request information, call the "set_request" POST method.
 
-6) Call "get_request_id" GET method, and copy the randomly generated id.
+5) Now switch to node 2. Call the get_request GET method and we should obtain the request message from node 1. However, get_request_id GET method should not work.
 
-7) Call "set_request_id" POST method using the id obtained in the previous step.
+6) Switch to node 3, and call the get_request_id GET method. Should return the request id. However, get_request should not work. This is the same for node 4, and all other nodes in the network that were not the receiver address.
 
-8) Now switch to node 2. Call the get_request GET method and we should obtain the request message from node 1. However, get_request_id GET method should not work.
+7) Since node 2 now has the request, it can use the book id to encrypt the book. Passing in the sender address, receiver address, and book id, call the add_book POST method. This will send the encrypted book to the receiver (node 1 in this case), and the key to decrypt the book to nodes 3 and 4.
 
-9) Switch to node 3, and call the get_request_id GET method. Should return the request id. However, get_request should not work. This is the same for node 4, and all other nodes in the network that were not the receiver address.
+8) Switch to node 1 and call get_book GET method. Should recieve a message with the encrypted book. However, should not be able to access the book key.
 
-10) Since node 2 now has the request, it can use the book id to encrypt the book. Passing in the sender address, receiver address, and book id, call the add_book POST method. This will send the encrypted book to the receiver (node 1 in this case), and the key to decrypt the book to nodes 3 and 4.
-
-11) Switch to node 1 and call get_book GET method. Should recieve a message with the encrypted book. However, should not be able to access the book key.
-
-12) Switch to node 3 and call get_book_key GET method. Should receive the key to decrypt the book. However, should not be able to access the encrypted book. Same for node 4.
+9) Switch to node 3 and call get_book_key GET method. Should receive the key to decrypt the book. However, should not be able to access the encrypted book. Same for node 4.
