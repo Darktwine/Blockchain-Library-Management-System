@@ -31,15 +31,6 @@ class Blockchain:
         else:
             raise ValueError('Invalid')
 
-    # creation of a new transaction, which will include both the request id and key for validation
-    def new_transaction(self, req_id, key):
-        self.transaction.append({
-            'proof': req_id+key
-        })
-        last_block = self.last_block
-        previous_hash = self.hash(last_block)
-        self.new_block(previous_hash)
-
     # creating a new block and clears out all previous requests data
     def new_block(self, previous_hash):
         block = {
@@ -49,24 +40,24 @@ class Blockchain:
         }
         self.transaction = []
         self.request = []
-        self.book = []
         self.request_id = []
+        self.book = []
         self.book_key = []
         self.chain.append(block)
         return block
 
-    # proof of work 
+    # proof of work, validates either the request id or the key, depending on the value passed in
     def proof(self, sender_address, receiver_address, value):
         # if value = 1 check id, if true id is valid
         if value == 1:
             confirm = 0
-            response = requests.get(f'http://{receiver_address}/get/id')
-            check_this = response.json()['id']
+            response = requests.get(f'http://{sender_address}/get_request_id')
+            check_this = response.json()['request_id']
             network = self.nodes
             for node in network:
                 if node != sender_address and node != receiver_address:
-                    response = requests.get(f'http://{node}/get/id')
-                    compare_this = response.json()['id']
+                    response = requests.get(f'http://{node}/get_request_id')
+                    compare_this = response.json()['request_id']
                     # compare the id from receiver_address with other nodes in network
                     if check_this == compare_this:
                         confirm += 1
@@ -76,13 +67,13 @@ class Blockchain:
         # if value = 2 check keys, if true key is valid
         if value == 2:
             confirm = 0
-            response = requests.get(f'http://{sender_address}/get/key')
-            check_this = response.json()['key']
+            response = requests.get(f'http://{sender_address}/get_book_key')
+            check_this = response.json()['book_key']
             network = self.nodes
             for node in network:
                 if node != sender_address and node != receiver_address:
-                    response = requests.get(f'http://{node}/get/key')
-                    compare_this = response.json()['key']
+                    response = requests.get(f'http://{node}/get_book_key')
+                    compare_this = response.json()['book_key']
                     # compare the key from sender_port with other nodes in network
                     if check_this == compare_this:
                         confirm += 1
@@ -93,7 +84,7 @@ class Blockchain:
     # check if >50% agrees
     def consensus(self, sender_address, receiver_address, confirm):
         # count all nodes in network but sender and receiver
-        # compare if agree is > 50%
+        # if over 50% of the nodes validate it, consensus is achieved
         counter = 0
         network = self.nodes
         for node in network:
@@ -102,10 +93,6 @@ class Blockchain:
         if confirm / counter > 0.5:
             return True
         return False
-
-
-
-
 
     def send_request(self, sender_address, receiver_address, book_id, request_message):
         # create a new request from the sender to the receiver
@@ -185,20 +172,56 @@ class Blockchain:
     def set_keys(self, book_key):
         self.book_key.append({'book_key': book_key})
 
+    # after sender address gets the encrypted book and other nodes get keys
+    # sender address sends receiver address the request id
+    def send_request_id_to_receiver(self, sender_address, receiver_address):
+        network = self.nodes
+        for node in network:
+            if node == receiver_address:
+                response = requests.get(f'http://{sender_address}/get_request_id')
+                if response.status_code == 200:
+                    requests.post(f'http://{node}/set_request_id', json={
+                        'request_id': response.json()['request_id']
+                    })
 
+    def send_book_key_to_receiver(self, sender_address, receiver_address):
+        network = self.nodes
+        for node in network:
+            if node == receiver_address:
+                response = requests.get(f'http://{sender_address}/get_book_key')
+                if response.status_code == 200:
+                    requests.post(f'http://{node}/set_key', json={
+                        'book_key': response.json()['book_key']
+                    })
 
-    # checks if chain is valid
-    def validate_chain(self, chain):
-        previous_block = chain[0]
-        counter = 1
-        while counter < len(chain):
-            current_block = chain[counter]
-            previous_hash = self.hash(previous_block)
-            if current_block['previous_hash'] != previous_hash:
-                return False
-            previous_block = current_block
-            counter = counter + 1
-        return True
+    # after key is sent sender node checks if key is valid by decrypting book
+    # decrypted book should be book_value requested
+    def decrypted_book(self, sender_address, receiver_address, book_id):
+        response = requests.get(f'http://{sender_address}/get_book_key')
+        key = response.json()['book_key'].encode()
+        response2 = requests.get(f'http://{sender_address}/get_book')
+        encrypted_book = response2.json()['encrypted_book'].encode()
+        f = Fernet(key)
+        book = f.decrypt(encrypted_book).decode()
+        if book == book_id:
+            return True
+        return False
+
+    def send_transaction(self, miner_address, request_id, book_key):
+        network = self.nodes
+        for node in network:
+            requests.post(f'http://{node}/set_transaction', json={
+                'request_id': request_id,
+                'book_key': book_key
+            })
+
+    def set_transactions(self, request_id, book_key):
+        self.transaction.append({
+            'proof': request_id + book_key
+        })
+        last_block = self.last_block
+        previous_hash = self.hash(last_block)
+        self.new_block(previous_hash)
 
     # hashing
     @staticmethod
@@ -224,19 +247,20 @@ blockchain = Blockchain()
 #######################################################
 #######################################################
 
-# create block
-@app.route('/add_block', methods=['GET'])
-def add_block():
-    last_block = blockchain.last_block
-    previous_hash = blockchain.hash(last_block)
-    block = blockchain.new_block(previous_hash)
+# add new nodes
+@app.route('/new_nodes', methods=['POST'])
+def new_nodes():
+    values = request.get_json()
+    nodes = values.get('nodes')
+    if nodes is None:
+        return "Error", 400
+    for node in nodes:
+        blockchain.create_nodes(node)
     response = {
-        'message': "new block",
-        'index': block['index'],
-        'transaction': block['transaction'],
-        'previous_hash': block['previous_hash']
+        'message': "Node created",
+        'total_nodes': list(blockchain.nodes)
     }
-    return jsonify(response), 200
+    return jsonify(response), 201
 
 # Generate a request
 @app.route('/add_request', methods=['POST'])
@@ -330,6 +354,124 @@ def set_key():
     response = {'message': "The book key has been sent to the other nodes."}
     return jsonify(response), 201
 
+@app.route('/send_request_id_for_validation', methods=['POST'])
+def send_request_id_for_validation():
+    # convert the POST info into JSON format, and save into requested_info
+    request_info = request.get_json()
+
+    # must have these keys for the request to be valid, generate an error if any are missing
+    required = ['sender_address', 'receiver_address']
+    if not all(keys in request_info for keys in required):
+        return 'Missing keys', 400
+
+    blockchain.send_request_id_to_receiver(request_info['sender_address'], request_info['receiver_address'])
+
+    response = {'message': f"Request id has been sent to {request_info['receiver_address']}."}
+    return jsonify(response), 201
+
+@app.route('/validate_request_id', methods=['POST'])
+def validate_request_id():
+    # convert the POST info into JSON format, and save into requested_info
+    request_info = request.get_json()
+
+    # must have these keys for the request to be valid, generate an error if any are missing
+    required = ['sender_address', 'receiver_address']
+    if not all(keys in request_info for keys in required):
+        return 'Missing keys', 400
+
+    # validated returns true or false after checking the request id against the other nodes in the network
+    validated = blockchain.proof(request_info['sender_address'], request_info['receiver_address'], value = 1)
+
+    if validated:
+        response = {'message': "The request id has been validated, achieving over 50 percent consensus."}
+    else:
+        response = {'message': "The request id has been rejected, failing to recieve over 50 percent consensus."}
+    return jsonify(response), 201
+
+@app.route('/send_book_key_for_validation', methods=['POST'])
+def send_book_key_for_validation():
+    # convert the POST info into JSON format, and save into requested_info
+    request_info = request.get_json()
+
+    # must have these keys for the request to be valid, generate an error if any are missing
+    required = ['sender_address', 'receiver_address']
+    if not all(keys in request_info for keys in required):
+        return 'Missing keys', 400
+
+    blockchain.send_book_key_to_receiver(request_info['sender_address'], request_info['receiver_address'])
+
+    response = {'message': f"Book key has been sent to {request_info['receiver_address']}."}
+    return jsonify(response), 201
+
+@app.route('/decrypt_book', methods=['POST'])
+def decrypt_book():
+     # convert the POST info into JSON format, and save into requested_info
+    request_info = request.get_json()
+
+    # must have these keys for the request to be valid, generate an error if any are missing
+    required = ['sender_address', 'receiver_address', 'book_id']
+    if not all(keys in request_info for keys in required):
+        return 'Missing keys', 400
+
+    decrypted = blockchain.decrypted_book(request_info['sender_address'], request_info['receiver_address'], request_info['book_id'])
+
+    if decrypted:
+        response = {'message': "The book key successfully decrypted the book."}
+    else:
+        response = {'message': "The book key has failed to decrypt the book."}
+    
+    return jsonify(response), 201
+
+@app.route('/validate_book_key', methods=['POST'])
+def validate_book_key():
+    # convert the POST info into JSON format, and save into requested_info
+    request_info = request.get_json()
+
+    # must have these keys for the request to be valid, generate an error if any are missing
+    required = ['sender_address', 'receiver_address']
+    if not all(keys in request_info for keys in required):
+        return 'Missing keys', 400
+
+    # validated returns true or false after checking the request id against the other nodes in the network
+    validated = blockchain.proof(request_info['sender_address'], request_info['receiver_address'], value = 2)
+
+    if validated:
+        response = {'message': "The book key has been validated, achieving over 50 percent consensus."}
+    else:
+        response = {'message': "The book key has been rejected, failing to recieve over 50 percent consensus."}
+
+    return jsonify(response), 201
+
+# mine the transaction as a block and add it to the blockchain
+@app.route('/mine_transaction', methods=['POST'])
+def mine_transaction():
+    values = request.get_json()
+    required = ['miner_address', 'request_id', 'book_key']
+    if not all(keys in values for keys in required):
+        return 'Missing keys', 400
+
+    blockchain.send_transaction(values['miner_address'], values['request_id'], values['book_key'])
+
+    response = {'message': "Transaction has been mined and added to the blockchain."}
+    return jsonify(response), 200
+
+# set the transaction for every node in the network
+@app.route('/set_transaction', methods=['POST'])
+def set_transaction():
+    # convert the POST info into JSON format, and save into requested_info
+    request_info = request.get_json()
+
+    # must have these keys for the request to be valid, generate an error if any are missing
+    required = ['request_id', 'book_key']
+    if not all(keys in request_info for keys in required):
+        return 'Missing keys for request', 400
+
+    # Send the information to the address of the receiver node
+    blockchain.set_transactions(request_info['request_id'], request_info['book_key'])
+
+    response = {'message': "The transaction has been sent to all nodes."}
+    return jsonify(response), 201
+
 # returns chain
 @app.route('/get_chain', methods=['GET'])
 def get_chain():
@@ -373,22 +515,6 @@ def get_book_key():
         'book_key': blockchain.book_key[0]['book_key']
     }
     return jsonify(response), 200
-
-
-# add new nodes
-@app.route('/new_nodes', methods=['POST'])
-def new_nodes():
-    values = request.get_json()
-    nodes = values.get('nodes')
-    if nodes is None:
-        return "Error", 400
-    for node in nodes:
-        blockchain.create_nodes(node)
-    response = {
-        'message': "Node created",
-        'total_nodes': list(blockchain.nodes)
-    }
-    return jsonify(response), 201
 
 
 if __name__ == '__main__':
