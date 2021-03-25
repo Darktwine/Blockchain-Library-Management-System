@@ -43,7 +43,7 @@ In a network of nodes, each node can request a book from another node that has i
         {
             "sender_address": "127.0.0.1:5000",
             "receiver_address": "127.0.0.1:5001",
-	    "book_id": 17,
+	        "book_id": 17,
             "request_message": "I request book b1 from you."
         }
         
@@ -62,4 +62,4 @@ In a network of nodes, each node can request a book from another node that has i
 
 11) Switch to node 1 and call get_book GET method. Should recieve a message with the encrypted book. However, should not be able to access the book key.
 
-12) Switch to node 3 and call get_book_key GET method. Should recieve the key to decrypt the book. However, should not be able to access the encrypted book. Same for node 4.
+12) Switch to node 3 and call get_book_key GET method. Should receive the key to decrypt the book. However, should not be able to access the encrypted book. Same for node 4.
