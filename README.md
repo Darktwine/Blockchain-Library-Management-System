@@ -57,3 +57,19 @@ In a network of nodes, each node can request a book from another node that has i
 8) Switch to node 1 and call get_book GET method. Should recieve a message with the encrypted book. However, should not be able to access the book key.
 
 9) Switch to node 3 and call get_book_key GET method. Should receive the key to decrypt the book. However, should not be able to access the encrypted book. Same for node 4.
+
+10) Now that node 1 has the encrypted book, it will give node 2 the request id. Call send_request_id_for_validation POST method.
+
+11) Switch over to node 2, who should now be able to access the request id through get_request_id GET method.
+
+12) Node 2 can validate this request id by comparing it to the other nodes in the network. Call validate_request_id POST, which will run the request id through the proof system and check for consensus of greater than 50% for nodes that validate it. If successful, will return a success message. If failed, will return a failure to achieve consensus message.
+
+13) If the request id is valid, node 2 can give node 1 the book key for decryption. Call send_book_key_for_validation POST method.
+
+14) Switch to node 1, and can get the key by calling book_key GET method. Can decrypt the book by calling thedecrypt_book POST, checking if the key is valid as the value of book id should equal the decrypted book. If successful, will return a message saying the book has been decrypted.
+
+15) Can also check book key with other nodes in the network through validate_book_key POST method, calling proof and consensus.
+
+16) Finally since node 1 has the request id, the book key, and is also the original sender of the request, it can mine the transaction to add to the block. Note that no other node in the network can mine the transaction. If they try to do so, it will fail. Call mine_transaction POST method containing the sender address, the request id and book key. This will add the transaction to the block and it will be included in the blockchain. When this is done, the data for requests and keys are reset.
+
+17) On any node in the network, can call get_chain GET method to view the entire chain, including the newly added transaction. This method is available for every node on the network and should all contain the exact same information.
