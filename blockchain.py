@@ -32,7 +32,7 @@ class Blockchain:
         else:
             raise ValueError('Invalid')
 
-    # creating a new block and clears out all previous requests data
+    # creates a new block and clears out all the data for the previous transaction
     def new_block(self, previous_hash):
         block = {
             'index': len(self.chain) + 1,
@@ -48,7 +48,7 @@ class Blockchain:
         self.chain.append(block)
         return block
 
-    # proof of work, validates either the request id or the key, depending on the value passed in
+    # proof of work validation to check either the request id(1) or book key(2), dependent on value passed in
     def proof(self, sender_address, receiver_address, value):
         # if value = 1 check id, if true id is valid
         if value == 1:
@@ -83,9 +83,9 @@ class Blockchain:
             if check:
                 return True
 
-    # check if >50% agrees
+    # check if over 50% of the network nodes have validated something as true from their own perspective
     def consensus(self, sender_address, receiver_address, confirm):
-        # count all nodes in network but sender and receiver
+        # count all nodes in the network except the sender and receiver
         # if over 50% of the nodes validate it, consensus is achieved
         counter = 0
         network = self.nodes
@@ -96,17 +96,19 @@ class Blockchain:
             return True
         return False
 
+    # sets the node who sent the original request for a book as the miner
     def set_miner(self):
         self.is_miner = True
 
+    # check if the calling node can actually mine the transaction (was the original requester for the book)
     def verify_miner(self):
         if self.is_miner == True:
             return True
         
         return False
 
+    # sends the request from the sender to the reciever over the network
     def send_request(self, sender_address, receiver_address, book_id, request_message):
-        # create a new request from the sender to the receiver
         network = self.nodes
         for node in network:
             if node == receiver_address:
@@ -117,6 +119,7 @@ class Blockchain:
                     'request_message': request_message
                 })
 
+    # add to the receiving node's own lists the request information sent over the network
     def set_request(self, sender_address, receiver_address, book_id, request_message):
         self.request.append({
             'sender_address': sender_address,
@@ -125,11 +128,7 @@ class Blockchain:
             'request_message': request_message
         })
 
-    def create_request_id(self, request_id):
-        self.request_id.append({
-            'request_id': request_id
-        })
-
+    # sends the request id from the sender to the all the other nodes over the network, except the receiver of the original request
     def send_request_id(self, sender_address, receiver_address):
         network = self.nodes
         for node in network:
@@ -144,8 +143,8 @@ class Blockchain:
     def set_request_ids(self, request_id):
         self.request_id.append({'request_id': request_id})
 
-    # encrypt book and generate the key with Fernet
-    # decode to send non bytes through network
+    # encrypt the book and use Fernet to generate the key
+    # decode for sending non bytes through the network
     def encrypt_book_and_create_key(self, book_id):
         book_key = Fernet.generate_key()
         ubyte_key = book_key.decode()
@@ -155,6 +154,7 @@ class Blockchain:
         self.book.append({'encrypted_book': ubyte_encrypted_book})
         self.book_key.append({'book_key': ubyte_key})
 
+    # sends the encrypted book to the original requester
     def send_book(self, sender_address, receiver_address):
         network = self.nodes
         for node in network:
@@ -165,6 +165,7 @@ class Blockchain:
                         'encrypted_book': response.json()['encrypted_book']
                     })
     
+    # sends book key to decrypt book to the other nodes
     def send_book_key(self, sender_address, receiver_address):
         network = self.nodes
         for node in network:
@@ -195,6 +196,8 @@ class Blockchain:
                         'request_id': response.json()['request_id']
                     })
 
+    # after the request id is received by the receiver address of the original request
+    # send the book key to the original sender to decrypt the book
     def send_book_key_to_receiver(self, sender_address, receiver_address):
         network = self.nodes
         for node in network:
@@ -205,8 +208,8 @@ class Blockchain:
                         'book_key': response.json()['book_key']
                     })
 
-    # after key is sent sender node checks if key is valid by decrypting book
-    # decrypted book should be book_value requested
+    # after book key is sent, the sender node checks if key is valid by decrypting book
+    # decrypted book should be the book id requested
     def decrypted_book(self, sender_address, receiver_address, book_id):
         response = requests.get(f'http://{sender_address}/get_book_key')
         key = response.json()['book_key'].encode()
@@ -218,6 +221,7 @@ class Blockchain:
             return True
         return False
 
+    # get the request id and book key from self to be used as proof
     def send_transaction(self, miner_address, request_id, book_key):
         network = self.nodes
         for node in network:
@@ -226,6 +230,7 @@ class Blockchain:
                 'book_key': book_key
             })
 
+    # concatenate request id and book key together as proof, and generate a new block
     def set_transactions(self, request_id, book_key):
         self.transaction.append({
             'proof': request_id + book_key
@@ -273,7 +278,7 @@ def new_nodes():
     }
     return jsonify(response), 201
 
-# Generate a request
+# generate a new request
 @app.route('/add_request', methods=['POST'])
 def add_request():
     # for the node creating a new request, set their miner status to true
@@ -289,7 +294,7 @@ def add_request():
 
     # Create and add request id to self
     request_id = uuid4()
-    blockchain.create_request_id(request_id)
+    blockchain.set_request_ids(request_id)
 
     # Send the information to the address of the receiver node
     blockchain.send_request(request_info['sender_address'], request_info['receiver_address'], request_info['book_id'], request_info['request_message'])
@@ -300,6 +305,7 @@ def add_request():
     response = {'message': f"Request for {request_info['receiver_address']} and the request id has been created."}
     return jsonify(response), 201
 
+# append information passed in about the request to self
 @app.route('/set_request', methods=['POST'])
 def set_request():
     # convert the POST info into JSON format, and save into requested_info
@@ -316,6 +322,7 @@ def set_request():
     response = {'message': f"The request has been sent for {request_info['receiver_address']}."}
     return jsonify(response), 201
 
+# append information passed in about the request id to self
 @app.route('/set_request_id', methods=['POST'])
 def set_request_id():
     # convert the POST info into JSON format, and save into requested_info
@@ -344,7 +351,7 @@ def add_book():
     response = {'message': "The requested book has been encrypted and the book key has been generated."}
     return jsonify(response), 201
 
-# set book
+# set book to self list
 @app.route('/set_book', methods=['POST'])
 def set_book():
     book_info = request.get_json()
@@ -368,6 +375,7 @@ def set_key():
     response = {'message': "The book key has been sent to the other nodes."}
     return jsonify(response), 201
 
+# sends request id to original receiver after encrypted book has been received
 @app.route('/send_request_id_for_validation', methods=['POST'])
 def send_request_id_for_validation():
     # convert the POST info into JSON format, and save into requested_info
@@ -383,6 +391,7 @@ def send_request_id_for_validation():
     response = {'message': f"Request id has been sent to {request_info['receiver_address']}."}
     return jsonify(response), 201
 
+# confirm the request id received has consensus (is the same for over 50% of other nodes on network)
 @app.route('/validate_request_id', methods=['POST'])
 def validate_request_id():
     # convert the POST info into JSON format, and save into requested_info
@@ -402,6 +411,7 @@ def validate_request_id():
         response = {'message': "The request id has been rejected, failing to recieve over 50 percent consensus."}
     return jsonify(response), 201
 
+# sends book key to original receiver after request id is received
 @app.route('/send_book_key_for_validation', methods=['POST'])
 def send_book_key_for_validation():
     # convert the POST info into JSON format, and save into requested_info
@@ -417,6 +427,7 @@ def send_book_key_for_validation():
     response = {'message': f"Book key has been sent to {request_info['receiver_address']}."}
     return jsonify(response), 201
 
+# use book key to decrypt book
 @app.route('/decrypt_book', methods=['POST'])
 def decrypt_book():
      # convert the POST info into JSON format, and save into requested_info
@@ -436,6 +447,7 @@ def decrypt_book():
     
     return jsonify(response), 201
 
+# confirm the book key received has consensus (is the same for over 50% of other nodes on network)
 @app.route('/validate_book_key', methods=['POST'])
 def validate_book_key():
     # convert the POST info into JSON format, and save into requested_info
