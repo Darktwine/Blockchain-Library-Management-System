@@ -48,9 +48,9 @@ class Blockchain:
         self.chain.append(block)
         return block
 
-    # proof of work validation to check either the request id(1) or book key(2), dependent on value passed in
+    # proof of work validation to check either the request id(1) or book key(2), depending on value passed in
     def proof(self, sender_address, receiver_address, value):
-        # if value = 1 check id, if true id is valid
+        # if value passed in is 1, check request id. If true the id is valid
         if value == 1:
             confirm = 0
             response = requests.get(f'http://{sender_address}/get_request_id')
@@ -66,7 +66,7 @@ class Blockchain:
             check = self.consensus(sender_address, receiver_address, confirm)
             if check:
                 return True
-        # if value = 2 check keys, if true key is valid
+        # if value passed in is 2, check book key. If true the key is valid
         if value == 2:
             confirm = 0
             response = requests.get(f'http://{sender_address}/get_book_key')
@@ -76,7 +76,7 @@ class Blockchain:
                 if node != sender_address and node != receiver_address:
                     response = requests.get(f'http://{node}/get_book_key')
                     compare_this = response.json()['book_key']
-                    # compare the key from sender_port with other nodes in network
+                    # compare the key from sender_address with other nodes in network
                     if check_this == compare_this:
                         confirm += 1
             check = self.consensus(sender_address, receiver_address, confirm)
@@ -85,7 +85,7 @@ class Blockchain:
 
     # check if over 50% of the network nodes have validated something as true from their own perspective
     def consensus(self, sender_address, receiver_address, confirm):
-        # count all nodes in the network except the sender and receiver
+        # count all the other nodes in the network, excluding the sender and receiver
         # if over 50% of the nodes validate it, consensus is achieved
         counter = 0
         network = self.nodes
